@@ -18,6 +18,7 @@ object Dependencies {
   }
 
   object Test {
+    val akkaTypedTestkit = "com.typesafe.akka" %% "akka-actor-testkit-typed" % Versions.akka % sbt.Test
     val scalaTest = "org.scalatest" %% "scalatest" % Versions.scalaTest % sbt.Test
     val h2Driver = "com.h2database" % "h2" % "1.4.200" % sbt.Test
     val logback = "ch.qos.logback" % "logback-classic" % "1.2.3" % sbt.Test
@@ -27,5 +28,6 @@ object Dependencies {
 
   val core = deps ++= Seq(Compile.akkaStream)
 
-  val slick = deps ++= Seq(Compile.slick, Compile.akkaPersistenceQuery, Test.h2Driver, Test.logback)
+  val slick =
+    deps ++= Seq(Compile.slick, Compile.akkaPersistenceQuery, Test.akkaTypedTestkit, Test.h2Driver, Test.logback)
 }

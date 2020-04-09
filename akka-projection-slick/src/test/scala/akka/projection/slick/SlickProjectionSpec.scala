@@ -6,10 +6,14 @@ package akka.projection.slick
 
 import java.util.UUID
 
+import akka.projection.testkit.ProjectionTestRunner
 import akka.stream.scaladsl.Source
 import akka.{ Done, NotUsed }
 import com.typesafe.config.{ Config, ConfigFactory }
 import org.scalatest.OptionValues
+import org.scalatest.concurrent.{ Eventually, ScalaFutures }
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpecLike
 import org.slf4j.LoggerFactory
 import slick.basic.DatabaseConfig
 import slick.dbio.DBIOAction
@@ -39,7 +43,14 @@ object SlickProjectionSpec {
       |""".stripMargin)
 }
 
-class SlickProjectionSpec extends SlickSpec(SlickProjectionSpec.config) with OptionValues {
+class SlickProjectionSpec
+    extends SlickSpec(SlickProjectionSpec.config)
+    with AnyWordSpecLike
+    with Matchers
+    with ScalaFutures
+    with ProjectionTestRunner
+    with Eventually
+    with OptionValues {
 
   val logger = LoggerFactory.getLogger(this.getClass)
 
