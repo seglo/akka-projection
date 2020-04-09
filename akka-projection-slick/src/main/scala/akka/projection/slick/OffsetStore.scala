@@ -11,7 +11,7 @@ import akka.annotation.ApiMayChange
 import slick.jdbc.JdbcProfile
 import akka.persistence.query
 
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 
 @ApiMayChange
 class OffsetStore[P <: JdbcProfile](db: P#Backend#Database, profile: P) {
@@ -25,18 +25,14 @@ class OffsetStore[P <: JdbcProfile](db: P#Backend#Database, profile: P) {
   private val SequenceM = "SEQ"
   private val TimeBasedUUIDM = "TBU"
 
-  def readOffset[Offset](projectionId: String): Future[Option[Offset]] = {
-    // map using Slick's own EC
-    implicit val ec = db.executor.executionContext
+  def readOffset[Offset](projectionId: String)(implicit ec: ExecutionContext): Future[Option[Offset]] = {
     val action =
       offsetTable.filter(_.projectionId === projectionId).result.headOption.map(row => fromRowToOffset[Offset](row))
 
     db.run(action)
   }
 
-  def saveOffset[Offset](projectionId: String, offset: Offset): slick.dbio.DBIO[Done] = {
-    // map using Slick's own EC
-    implicit val ec = db.executor.executionContext
+  def saveOffset[Offset](projectionId: String, offset: Offset)(implicit ec: ExecutionContext): slick.dbio.DBIO[Done] = {
     val (offsetStr, manifest) = stringOffsetAndManifest(offset)
     offsetTable.insertOrUpdate(OffsetRow(projectionId, offsetStr, manifest)).map(_ => Done)
   }

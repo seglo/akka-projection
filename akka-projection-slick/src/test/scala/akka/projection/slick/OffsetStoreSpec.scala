@@ -18,7 +18,7 @@ import slick.basic.DatabaseConfig
 import slick.jdbc.H2Profile
 
 import scala.concurrent.duration._
-import scala.concurrent.Await
+import scala.concurrent.{ Await, ExecutionContext }
 
 object OffsetStoreSpec {
   def config: Config = ConfigFactory.parseString("""
@@ -52,6 +52,8 @@ class OffsetStoreSpec extends AnyWordSpecLike with Matchers with ScalaFutures wi
   }
 
   "The OffsetStore" must {
+
+    implicit val ec = dbConfig.db.executor.executionContext
 
     "create and update offsets" in {
       val projectionId = "projection-with-long"

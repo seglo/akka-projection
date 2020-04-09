@@ -7,12 +7,11 @@ package akka.projection.slick.internal
 import akka.Done
 import akka.actor.ClassicActorSystemProvider
 import akka.annotation.InternalApi
-import akka.event.{ LogSource, Logging }
+import akka.event.Logging
 import akka.projection.Projection
 import akka.projection.slick.OffsetStore
 import akka.stream.scaladsl.{ Keep, Sink, Source }
 import akka.stream.{ KillSwitch, KillSwitches }
-import org.slf4j.LoggerFactory
 import slick.basic.DatabaseConfig
 import slick.dbio.DBIO
 import slick.jdbc.JdbcProfile
@@ -50,11 +49,11 @@ private[projection] class SlickProjectionImpl[Offset, StreamElement, P <: JdbcPr
         .flatMapConcat[StreamElement, Any](identity)
         .mapAsync(1) { elt =>
           // run user function and offset storage on the same transaction
-          // offset storage comes last, any side-effect in user function is therefore at-least-once
+          // any side-effect in user function is at-least-once
           val txDBIO =
-            eventHandler(elt).flatMap(_ => offsetStore.saveOffset(projectionId, offsetExtractor(elt))).transactionally
+            offsetStore.saveOffset(projectionId, offsetExtractor(elt)).flatMap(_ => eventHandler(elt))
 
-          databaseConfig.db.run(txDBIO)
+          databaseConfig.db.run(txDBIO.transactionally)
         }
         .viaMat(KillSwitches.single)(Keep.right)
         .toMat(Sink.ignore)(Keep.left)

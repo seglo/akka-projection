@@ -15,7 +15,7 @@ import slick.basic.DatabaseConfig
 import slick.dbio.DBIOAction
 import slick.jdbc.H2Profile
 
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 
 object SlickProjectionSpec {
@@ -87,7 +87,7 @@ class SlickProjectionSpec extends SlickSpec(SlickProjectionSpec.config) with Opt
       }
     }
 
-    "restart from previous offset " in {
+    "restart from previous offset - fail with DBIOAction.failed" in {
 
       implicit val dispatcher = actorSystem.dispatcher
 
@@ -106,6 +106,122 @@ class SlickProjectionSpec extends SlickSpec(SlickProjectionSpec.config) with Opt
           offsetExtractor = offsetExtractor,
           databaseConfig = dbConfig) { envelope =>
           if (envelope.offset == 4L) DBIOAction.failed(new RuntimeException("fail on third element"))
+          else repository.concatToText(envelope.id, envelope.message)
+        }
+
+      runProjection(slickProjectionFailing) {
+        eventually {
+          withClue("check: projection is interrupted on fourth element") {
+            val concatStr = dbConfig.db.run(repository.findById(entityId)).futureValue.value
+            concatStr.text shouldBe "abc|def|ghi"
+          }
+        }
+      }
+      withClue("check: last seen offset is 3L") {
+        val offset = offsetStore.readOffset[Long](projectionId).futureValue.value
+        offset shouldBe 3L
+      }
+
+      // re-run projection without failing function
+      val slickProjection =
+        SlickProjection.transactional(
+          projectionId = projectionId,
+          sourceProvider = sourceProvider(entityId),
+          offsetExtractor = offsetExtractor,
+          databaseConfig = dbConfig) { envelope => repository.concatToText(envelope.id, envelope.message) }
+
+      runProjection(slickProjection) {
+        eventually {
+          withClue("checking: all values were concatenated") {
+            val concatStr = dbConfig.db.run(repository.findById(entityId)).futureValue.value
+            concatStr.text shouldBe "abc|def|ghi|jkl|mno|pqr"
+          }
+        }
+      }
+
+      withClue("check: all offsets were seen") {
+        val offset = offsetStore.readOffset[Long](projectionId).futureValue.value
+        offset shouldBe 6L
+      }
+    }
+
+    "restart from previous offset - fail with throwing an exception" in {
+
+      implicit val dispatcher = actorSystem.dispatcher
+
+      val projectionId = UUID.randomUUID().toString
+      val entityId = UUID.randomUUID().toString
+
+      withClue("check - offset is empty") {
+        val offsetOpt = offsetStore.readOffset[Long](projectionId).futureValue
+        offsetOpt shouldBe empty
+      }
+
+      val slickProjectionFailing =
+        SlickProjection.transactional(
+          projectionId = projectionId,
+          sourceProvider = sourceProvider(entityId),
+          offsetExtractor = offsetExtractor,
+          databaseConfig = dbConfig) { envelope =>
+          if (envelope.offset == 4L) throw new RuntimeException("fail on third element")
+          else repository.concatToText(envelope.id, envelope.message)
+        }
+
+      runProjection(slickProjectionFailing) {
+        eventually {
+          withClue("check: projection is interrupted on fourth element") {
+            val concatStr = dbConfig.db.run(repository.findById(entityId)).futureValue.value
+            concatStr.text shouldBe "abc|def|ghi"
+          }
+        }
+      }
+      withClue("check: last seen offset is 3L") {
+        val offset = offsetStore.readOffset[Long](projectionId).futureValue.value
+        offset shouldBe 3L
+      }
+
+      // re-run projection without failing function
+      val slickProjection =
+        SlickProjection.transactional(
+          projectionId = projectionId,
+          sourceProvider = sourceProvider(entityId),
+          offsetExtractor = offsetExtractor,
+          databaseConfig = dbConfig) { envelope => repository.concatToText(envelope.id, envelope.message) }
+
+      runProjection(slickProjection) {
+        eventually {
+          withClue("checking: all values were concatenated") {
+            val concatStr = dbConfig.db.run(repository.findById(entityId)).futureValue.value
+            concatStr.text shouldBe "abc|def|ghi|jkl|mno|pqr"
+          }
+        }
+      }
+
+      withClue("check: all offsets were seen") {
+        val offset = offsetStore.readOffset[Long](projectionId).futureValue.value
+        offset shouldBe 6L
+      }
+    }
+
+    "restart from previous offset - fail with bad insert on user code" in {
+
+      implicit val dispatcher = actorSystem.dispatcher
+
+      val projectionId = UUID.randomUUID().toString
+      val entityId = UUID.randomUUID().toString
+
+      withClue("check - offset is empty") {
+        val offsetOpt = offsetStore.readOffset[Long](projectionId).futureValue
+        offsetOpt shouldBe empty
+      }
+
+      val slickProjectionFailing =
+        SlickProjection.transactional(
+          projectionId = projectionId,
+          sourceProvider = sourceProvider(entityId),
+          offsetExtractor = offsetExtractor,
+          databaseConfig = dbConfig) { envelope =>
+          if (envelope.offset == 4L) repository.updateWithNullValue(envelope.id)
           else repository.concatToText(envelope.id, envelope.message)
         }
 
@@ -185,9 +301,7 @@ class SlickProjectionSpec extends SlickSpec(SlickProjectionSpec.config) with Opt
       def * = (id, concatenated).mapTo[ConcatStr]
     }
 
-    def concatToText(id: String, payload: String) = {
-      // map using Slick's own EC
-      implicit val ec = dbConfig.db.executor.executionContext
+    def concatToText(id: String, payload: String)(implicit ec: ExecutionContext) = {
       for {
         concatStr <- findById(id).map {
           case Some(concatStr) => concatStr.concat(payload)
@@ -195,6 +309,13 @@ class SlickProjectionSpec extends SlickSpec(SlickProjectionSpec.config) with Opt
         }
         _ <- concatStrTable.insertOrUpdate(concatStr)
       } yield Done
+    }
+
+    /**
+     * Try to insert a row with a null value. This will code the DB ops to fail
+     */
+    def updateWithNullValue(id: String)(implicit ec: ExecutionContext) = {
+      concatStrTable.insertOrUpdate(ConcatStr(id, null)).map(_ => Done)
     }
 
     def findById(id: String): DBIO[Option[ConcatStr]] =
