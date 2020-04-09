@@ -16,13 +16,9 @@ import slick.jdbc.H2Profile
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
+import akka.actor.testkit.typed.scaladsl.{ ActorTestKit, ScalaTestWithActorTestKit }
 
-abstract class SlickSpec(config: Config) extends Suite with BeforeAndAfterAll {
-
-  private val testKit = ActorTestKit("slick-test", config.withFallback(ConfigFactory.load()))
-
-  implicit val actorSystem: ActorSystem = testKit.system.classicSystem
+abstract class SlickSpec(config: Config) extends ScalaTestWithActorTestKit(config) {
 
   val dbConfig: DatabaseConfig[H2Profile] = DatabaseConfig.forConfig("akka.projection.slick", config)
 
@@ -34,7 +30,7 @@ abstract class SlickSpec(config: Config) extends Suite with BeforeAndAfterAll {
   }
 
   override protected def afterAll(): Unit = {
-    testKit.shutdownTestKit()
+    super.afterAll()
     dbConfig.db.close()
   }
 }

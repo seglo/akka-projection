@@ -46,15 +46,12 @@ object SlickProjectionSpec {
 class SlickProjectionSpec
     extends SlickSpec(SlickProjectionSpec.config)
     with AnyWordSpecLike
-    with Matchers
-    with ScalaFutures
     with ProjectionTestRunner
-    with Eventually
     with OptionValues {
 
   val logger = LoggerFactory.getLogger(this.getClass)
 
-  implicit val patience: PatienceConfig = PatienceConfig(10.seconds, 500.millis)
+  implicit override val patience: PatienceConfig = PatienceConfig(10.seconds, 500.millis)
 
   val repository = new TestRepository(dbConfig)
 
@@ -67,7 +64,7 @@ class SlickProjectionSpec
 
     "persist events and offset in same transactional" in {
 
-      implicit val dispatcher = actorSystem.dispatcher
+      implicit val dispatcher = testKit.system.executionContext
 
       val projectionId = UUID.randomUUID().toString
       val entityId = UUID.randomUUID().toString
@@ -100,7 +97,7 @@ class SlickProjectionSpec
 
     "restart from previous offset - fail with DBIOAction.failed" in {
 
-      implicit val dispatcher = actorSystem.dispatcher
+      implicit val dispatcher = testKit.system.executionContext
 
       val projectionId = UUID.randomUUID().toString
       val entityId = UUID.randomUUID().toString
@@ -158,7 +155,7 @@ class SlickProjectionSpec
 
     "restart from previous offset - fail with throwing an exception" in {
 
-      implicit val dispatcher = actorSystem.dispatcher
+      implicit val dispatcher = testKit.system.executionContext
 
       val projectionId = UUID.randomUUID().toString
       val entityId = UUID.randomUUID().toString
@@ -216,7 +213,7 @@ class SlickProjectionSpec
 
     "restart from previous offset - fail with bad insert on user code" in {
 
-      implicit val dispatcher = actorSystem.dispatcher
+      implicit val dispatcher = testKit.system.executionContext
 
       val projectionId = UUID.randomUUID().toString
       val entityId = UUID.randomUUID().toString
