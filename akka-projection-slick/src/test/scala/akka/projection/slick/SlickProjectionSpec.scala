@@ -20,17 +20,21 @@ import scala.concurrent.duration._
 
 object SlickProjectionSpec {
   def config: Config = ConfigFactory.parseString("""
-      |akka.projection.slick = {
       |
-      |  profile = "slick.jdbc.H2Profile$"
+      |akka {
+      | loglevel = "DEBUG"
+      | projection.slick = {
       |
-      |  # TODO: configure connection pool and slick async executor
-      |  db = {
-      |   url = "jdbc:h2:mem:test1"
-      |   driver = org.h2.Driver
-      |   connectionPool = disabled
-      |   keepAliveConnection = true
-      |  }
+      |   profile = "slick.jdbc.H2Profile$"
+      |
+      |   # TODO: configure connection pool and slick async executor
+      |   db = {
+      |    url = "jdbc:h2:mem:test1"
+      |    driver = org.h2.Driver
+      |    connectionPool = disabled
+      |    keepAliveConnection = true
+      |   }
+      | }
       |}
       |""".stripMargin)
 }

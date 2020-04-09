@@ -6,7 +6,7 @@ package akka.projection.slick
 
 import akka.actor.ActorSystem
 import akka.projection.testkit.ProjectionTestRunner
-import com.typesafe.config.Config
+import com.typesafe.config.{ Config, ConfigFactory }
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.{ Eventually, ScalaFutures }
 import org.scalatest.matchers.should.Matchers
@@ -34,7 +34,7 @@ abstract class SlickSpec(config: Config)
   val offsetStore = new OffsetStore(dbConfig.db, dbConfig.profile)
 
   override protected def beforeAll(): Unit = {
-    _actorSystem = ActorSystem("slick-test")
+    _actorSystem = ActorSystem("slick-test", config.withFallback(ConfigFactory.load()))
     // create offset table
     Await.ready(offsetStore.createIfNotExists, 3.seconds)
   }

@@ -7,10 +7,11 @@ package akka.projection.slick.internal
 import akka.Done
 import akka.actor.ClassicActorSystemProvider
 import akka.annotation.InternalApi
+import akka.event.{ LogSource, Logging }
 import akka.projection.Projection
 import akka.projection.slick.OffsetStore
-import akka.stream.{ KillSwitch, KillSwitches }
 import akka.stream.scaladsl.{ Keep, Sink, Source }
+import akka.stream.{ KillSwitch, KillSwitches }
 import org.slf4j.LoggerFactory
 import slick.basic.DatabaseConfig
 import slick.dbio.DBIO
@@ -26,13 +27,14 @@ private[projection] class SlickProjectionImpl[Offset, StreamElement, P <: JdbcPr
     eventHandler: StreamElement => DBIO[Done])
     extends Projection {
 
-  private val logger = LoggerFactory.getLogger(this.getClass)
-
   private val offsetStore = new OffsetStore(databaseConfig.db, databaseConfig.profile)
 
   private var shutdown: Option[KillSwitch] = None
 
   override def start()(implicit systemProvider: ClassicActorSystemProvider): Unit = {
+
+    // TODO: add a LogSource for projection when we have a name and key
+    val akkaLogger = Logging(systemProvider.classicSystem, this.getClass)
 
     implicit val dispatcher = systemProvider.classicSystem.dispatcher
     import databaseConfig.profile.api._
@@ -42,7 +44,7 @@ private[projection] class SlickProjectionImpl[Offset, StreamElement, P <: JdbcPr
     val killSwitch =
       Source
         .future(lastKnownOffset.map { offsetOpt =>
-          logger.debug(s"Starting projection '$projectionId' from offset '$offsetOpt' ")
+          akkaLogger.debug("Starting projection '{}' from offset '{}'", projectionId, offsetOpt)
           sourceProvider(offsetOpt)
         })
         .flatMapConcat[StreamElement, Any](identity)
