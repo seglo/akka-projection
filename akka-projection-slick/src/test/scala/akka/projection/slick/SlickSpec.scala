@@ -22,7 +22,7 @@ abstract class SlickSpec(config: Config) extends Suite with BeforeAndAfterAll {
 
   private val testKit = ActorTestKit("slick-test", config.withFallback(ConfigFactory.load()))
 
-  implicit def actorSystem: ActorSystem = testKit.internalSystem.classicSystem
+  implicit val actorSystem: ActorSystem = testKit.system.classicSystem
 
   val dbConfig: DatabaseConfig[H2Profile] = DatabaseConfig.forConfig("akka.projection.slick", config)
 
