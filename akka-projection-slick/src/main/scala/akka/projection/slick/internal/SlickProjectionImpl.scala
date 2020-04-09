@@ -47,6 +47,7 @@ private[projection] class SlickProjectionImpl[Offset, StreamElement, P <: JdbcPr
           sourceProvider(offsetOpt)
         })
         .flatMapConcat[StreamElement, Any](identity)
+        .viaMat(KillSwitches.single)(Keep.right)
         .mapAsync(1) { elt =>
           // run user function and offset storage on the same transaction
           // any side-effect in user function is at-least-once
@@ -55,7 +56,6 @@ private[projection] class SlickProjectionImpl[Offset, StreamElement, P <: JdbcPr
 
           databaseConfig.db.run(txDBIO.transactionally)
         }
-        .viaMat(KillSwitches.single)(Keep.right)
         .toMat(Sink.ignore)(Keep.left)
         .run()
 
